@@ -15,6 +15,10 @@
 #include <cstdio>
 #include <tuple>
 
+template <class type> time_t addTime(const time_t& time, const int& value) {
+    return std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(time) + type(value));
+}
+
 
 
 void event_loop(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std::vector<std::function< void() >>>& events) {
@@ -29,9 +33,9 @@ void event_loop(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, s
             }
             std::cout << "continue" << std::endl;
             std::cout << std::put_time(&timeNow, "%d %m %Y %H:%M:%S") << std::endl;
-            actualTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(mktime(&timeNow)) + std::chrono::minutes(5));
-            localtime_s(&timeNow,&actualTime);
-        }
+            actualTime = addTime<std::chrono::minutes>(mktime(&timeNow), 5);
+            localtime_s(&timeNow, &actualTime);
+        } 
         
         std::chrono::seconds dura(5);
         std::this_thread::sleep_for(dura);
@@ -86,26 +90,26 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
             std::time_t timeMax = 0;
 
             if (parkingType == "ORANGE") {
-                timeMax = std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(timeBegin) + std::chrono::minutes(60));
+                timeMax = addTime<std::chrono::hours>(timeBegin, 1);
             }
 
             if (parkingType == "PURPLE") {
-                timeMax = std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(timeBegin) + std::chrono::hours(3));
+                timeMax = addTime<std::chrono::hours>(timeBegin, 3);
             }
 
             if (parkingType == "BLUE") {
-                timeMax = std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(timeBegin) + std::chrono::hours(24));
+                timeMax = addTime<std::chrono::hours>(timeBegin, 24);
             }
 
-            std::time_t timeStop = std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(timeBegin) + std::chrono::minutes(duration));
-            std::time_t timeMessage = std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(timeStop) - std::chrono::minutes(10));
+            std::time_t timeStop = addTime<std::chrono::minutes>(timeBegin, duration);
+            std::time_t timeMessage = addTime<std::chrono::minutes>(timeStop, -10);
 
             if (timeStop > timeMax) {
                 std::cout << "Time too long" << std::endl;
                 continue;
             }
 
-            for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(timeIterator) + std::chrono::minutes(15))) {
+            for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = addTime<std::chrono::minutes>(timeIterator, 15)) {
                 if (carsInParking.count({ place, timeIterator })) {
                     if (carsInParking[{ place, timeIterator }].size() == maxCapacityOfLocation) {
                         std::cout << "Sorry, all parking reserved." << std::endl;
@@ -119,10 +123,10 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
                 continue;
             }
 
-            for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(timeIterator) + std::chrono::minutes(15))) {
+            for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = addTime<std::chrono::minutes>(timeIterator, 15)) {
                 if (!carsInParking.count({ place, timeIterator })) {
                     carsInParking[{ place, timeIterator }] = std::set<std::string>();
-                    std::time_t whenToDelete = timeIterator = std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(timeIterator) + std::chrono::minutes(15));
+                    std::time_t whenToDelete = timeIterator = addTime<std::chrono::minutes>(timeIterator, 15);
                     if (!events.count(whenToDelete)) {
                         events[whenToDelete] = std::vector<std::function <void()>>();
                     }

@@ -58,6 +58,10 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
             pause = false;
         }
 
+        if (command == "money") {
+            std::cout << "Income is:" << wallet << std::endl;
+        }
+
         if (std::regex_match(command, std::regex("(Program)(.*)"))) {
             int duration;
             bool possible = true;

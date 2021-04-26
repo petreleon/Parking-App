@@ -15,13 +15,106 @@
 #include <cstdio>
 #include <tuple>
 
+
 template <class type> time_t addTime(const time_t& time, const int& value) {
     return std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(time) + type(value));
 }
 
+template <class type> struct Model {
+    type v;
+};
+
+template <class type> bool operator< (const Model<type>& model1, const Model<type>& model2) {
+    return model1.v < model2.v;
+}
+
+struct Car: Model<std::string> {
+    
+};
+
+struct ParkingPlace : Model<std::string> {
+
+};
+
+struct ParkingType : Model<std::string> {
+    std::time_t timeMax(const std::time_t& timeBegin) {
+        std::time_t timeMax = 0;
+        if (this->v == "ORANGE") {
+            timeMax = addTime<std::chrono::hours>(timeBegin, 1);
+        }
+
+        if (this->v == "PURPLE") {
+            timeMax = addTime<std::chrono::hours>(timeBegin, 3);
+        }
+
+        if (this->v == "BLUE") {
+            timeMax = addTime<std::chrono::hours>(timeBegin, 24);
+        }
+
+        return timeMax;
+    }
+}; 
+
+struct ParkingZone : Model<std::string> {
+
+};
+
+struct PlaceMax : Model<unsigned> {
+    bool possibleToIncrease(const unsigned& counting) {
+        return counting < this->v;
+    }
+};
 
 
-void event_loop(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std::vector<std::function< void() >>>& events) {
+struct Hour : Model<unsigned> {
+
+};
+
+struct Minute : Model<unsigned> {
+
+};
+
+struct ZoneHourMinute : Model<std::tuple<ParkingZone, Hour, Minute>> {
+
+}; 
+
+struct ZoneTypeMax : Model<std::tuple<ParkingZone, ParkingType, PlaceMax>> {
+    
+};
+
+//ZoneHourMinute zoneExample1({ {Zone({"22"}), Hour({23}), Minute({23})} });
+//ZoneHourMinute zoneExample2({ {Zone({"w22"}), Hour({23}), Minute({23})} });
+
+struct Money : Model<long double> {
+    Money operator + (const Money& money) {
+        return { this->v + money.v };
+    }
+
+    Money operator += (const Money& money) {
+        (*this) = (*this) + money;
+        return (*this);
+    }
+};
+
+
+typedef std::map<time_t, std::vector<std::function< void() >>> EventsMap;
+typedef std::map<ParkingPlace, ZoneTypeMax> ParkingPlaceDetails;
+typedef std::map < ZoneHourMinute, Money> ParkingZonePrices;
+
+void carCommandParsing(ParkingPlaceDetails& parkingPlaces,const std::string& command, ZoneTypeMax& zoneTypeMax, std::time_t& timeBegin, std::time_t& duration, Car &car, ParkingPlace place) {
+    std::string ignore, date, clock;
+    std::stringstream ssComm(command);
+    ssComm >> ignore >> car.v >> ignore >> place.v >> date >> clock >> duration;
+
+    std::cout << car.v << " " << place.v << " " << date << " " << clock << std::endl;
+    std::stringstream ssTime(date + " " + clock + ":00");
+    std::tm timeBeginParking;
+    ssTime >> std::get_time(&timeBeginParking, "%d_%m_%Y %H:%M:%S");
+    timeBegin = std::mktime(&timeBeginParking);
+    zoneTypeMax = parkingPlaces[ParkingPlace({ place })];
+}
+
+void event_loop(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events) {
     for (;!toClose;) {
         if (!pause) {
             time_t actualTime = mktime(&timeNow);
@@ -42,11 +135,12 @@ void event_loop(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, s
     }
 }
 
-void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std::vector<std::function< void() >>>& events, std::map < std::tuple <std::string, unsigned, unsigned>, float>  &parkingZonePrices, std::map<std::string, std::tuple < std::string, std::string, unsigned> > &parkingPlaces) {
+void commands(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events, ParkingZonePrices& parkingZonePrices, ParkingPlaceDetails &parkingPlaces) {
     std::string command;
-    std::map<std::tuple<std::string, time_t>, std::set<std::string>> carsInParking;
+    ZoneTypeMax zoneTypeMax;
+    std::map<std::tuple<ParkingPlace, time_t>, std::set<Car>> carsInParking;
     std::tm timeIteratorStruct_;
-    long double wallet = 0;
+    Money wallet({ 0 });
     while (!toClose) {
         std::getline(std::cin, command);
         if (command == "exit") {
@@ -63,43 +157,26 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
         }
 
         if (command == "money") {
-            std::cout << "Income is:" << wallet << std::endl;
+            std::cout << "Income is:" << wallet.v << std::endl;
         }
 
         if (std::regex_match(command, std::regex("(Program)(.*)"))) {
-            int duration;
+            time_t duration;
             bool possible = true;
-            std::string car, ignore, date, clock, place;
-            std::stringstream ssComm(command);
-            ssComm >> ignore >> car >> ignore >> place >> date >> clock >> duration;
-
-            std::cout << car << " " << place << " " << date << " " << clock << std::endl;
-            std::stringstream ssTime(date + " " + clock+":00");
-            std::tm timeBeginParking;
-            ssTime >> std::get_time(&timeBeginParking, "%d_%m_%Y %H:%M:%S");
-            std::time_t timeBegin = std::mktime(&timeBeginParking);
-            unsigned maxCapacityOfLocation = std::get<2>(parkingPlaces[place]);
-            std::string parkingType = std::get<1>(parkingPlaces[place]);
-            std::string parkingZone = std::get<0>(parkingPlaces[place]);
-            
+            std::time_t timeBegin;
+            ParkingPlace place;
+            ZoneTypeMax zoneTypeMax;
+            Car car;
+            carCommandParsing(parkingPlaces, command, zoneTypeMax, timeBegin, duration, car, place);
+            PlaceMax maxCapacityOfLocation = std::get<PlaceMax>(zoneTypeMax.v);
+            ParkingType parkingType = std::get<ParkingType>(zoneTypeMax.v);
+            ParkingZone parkingZone = std::get<ParkingZone>(zoneTypeMax.v);
             if (timeBegin < mktime(&timeNow)) {
                 std::cout << "you can't reserve the past." << std::endl;
                 continue;
             }
 
-            std::time_t timeMax = 0;
-
-            if (parkingType == "ORANGE") {
-                timeMax = addTime<std::chrono::hours>(timeBegin, 1);
-            }
-
-            if (parkingType == "PURPLE") {
-                timeMax = addTime<std::chrono::hours>(timeBegin, 3);
-            }
-
-            if (parkingType == "BLUE") {
-                timeMax = addTime<std::chrono::hours>(timeBegin, 24);
-            }
+            std::time_t timeMax = parkingType.timeMax(timeBegin);
 
             std::time_t timeStop = addTime<std::chrono::minutes>(timeBegin, duration);
             std::time_t timeMessage = addTime<std::chrono::minutes>(timeStop, -10);
@@ -111,7 +188,7 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
 
             for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = addTime<std::chrono::minutes>(timeIterator, 15)) {
                 if (carsInParking.count({ place, timeIterator })) {
-                    if (carsInParking[{ place, timeIterator }].size() == maxCapacityOfLocation) {
+                    if (maxCapacityOfLocation.possibleToIncrease(carsInParking[{ place, timeIterator }].size())) {
                         std::cout << "Sorry, all parking reserved." << std::endl;
                         possible = false;
                         break;
@@ -125,7 +202,7 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
 
             for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = addTime<std::chrono::minutes>(timeIterator, 15)) {
                 if (!carsInParking.count({ place, timeIterator })) {
-                    carsInParking[{ place, timeIterator }] = std::set<std::string>();
+                    carsInParking[{ place, timeIterator }] = std::set<Car>();
                     std::time_t whenToDelete = timeIterator = addTime<std::chrono::minutes>(timeIterator, 15);
                     if (!events.count(whenToDelete)) {
                         events[whenToDelete] = std::vector<std::function <void()>>();
@@ -139,7 +216,8 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
                 carsInParking[{ place, timeIterator }].insert(car);
                 
                 localtime_s(&timeIteratorStruct_, &timeIterator);
-                wallet += parkingZonePrices[{ parkingZone, timeIteratorStruct_.tm_hour, timeIteratorStruct_.tm_min}];
+                ZoneHourMinute zoneHourMinute({{ParkingZone({ parkingZone }), Hour({ (unsigned)timeIteratorStruct_.tm_hour }), Minute({ (unsigned)timeIteratorStruct_.tm_min })}} );
+                wallet += parkingZonePrices[zoneHourMinute];
             }
 
             if (!events.count(timeBegin)) {
@@ -147,7 +225,7 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
             }
             events[timeBegin].push_back([car, place]()
                 {
-                    std::cout << car << " parking at " << place << std::endl;
+                    std::cout << car.v << " parking at " << place.v << std::endl;
                 }
             );
 
@@ -156,7 +234,7 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
             }
             events[timeMessage].push_back([car, place]()
                 {
-                    std::cout << "Attention! Your parking for " << car << " at " << place << " is about to expire" << std::endl;
+                    std::cout << "Attention! Your parking for " << car.v << " at " << place.v << " is about to expire" << std::endl;
                 }
             );
 
@@ -165,7 +243,7 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
             }
             events[timeStop].push_back([car, place]()
                 {
-                    std::cout << car << " left " << place << std::endl;
+                    std::cout << car.v << " left " << place.v << std::endl;
                 }
             );
         }
@@ -174,7 +252,7 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, std::map<time_t, std
 
 int main()
 {
-    std::map < std::tuple <std::string,unsigned, unsigned>, float>  parkingZonePrices;
+    ParkingZonePrices parkingZonePrices;
 
     std::ifstream parkingZones("parking zones.txt");
 
@@ -183,18 +261,18 @@ int main()
     std::string  idZone, zonePrice;
     while (parkingZones >> idZone >> zonePrice) {
         std::cout << idZone << " " << zonePrice << std::endl;
-        float zonePricePerQuarter = std::stof(zonePrice) / 4;
+        Money zonePricePerQuarter = { std::stof(zonePrice) / 4 };
         for (unsigned hour = 0; hour < 24; ++hour) {
             for (unsigned minute = 0; minute < 60; minute += 15) {
-                parkingZonePrices[{idZone, hour, minute}] = zonePricePerQuarter;
+                parkingZonePrices[{ { { ParkingZone{ idZone }, Hour{ hour }, Minute{ minute }} } }] = zonePricePerQuarter;
             }
         }
     }
     
     std::string locationID, zoneType, parkingType, maxParking;
-    std::map<std::string, std::tuple < std::string, std::string, unsigned> > parkingPlaces;
+    ParkingPlaceDetails parkingPlaces;
     while (parkinglocations >> locationID >> zoneType >> parkingType >> maxParking) {
-        parkingPlaces[locationID] = { zoneType, parkingType, std::stoi(maxParking) };
+        parkingPlaces[ParkingPlace({ locationID })] = { { { ParkingZone{zoneType}, ParkingType{parkingType}, PlaceMax{(unsigned)std::stoi(maxParking)} } } };
         std::cout << locationID << " " << zoneType << " " << parkingType << " " << maxParking << std::endl;
     }
 
@@ -206,7 +284,7 @@ int main()
         sscanf_s(startTime.c_str(), "%d:%d", &hourStart, &minuteStart);
         sscanf_s(stopTime.c_str(), "%d:%d", &hourStop, &minuteStop);
         for (unsigned hour = hourStart, minute = minuteStart; hour != hourStop or minute != minuteStop; minute += 15, hour += minute / 60, minute %= 60, hour %= 24) {
-            parkingZonePrices[{idZone, hour, minute}] *= ratioMultiplier;
+            parkingZonePrices[{ { { ParkingZone{ idZone }, Hour{ hour }, Minute{ minute }} } }].v *= ratioMultiplier;
         }
     }
     std::tm actualTimeStruct = {};
@@ -218,7 +296,7 @@ int main()
     std::cout << std::put_time(&actualTimeStruct, "%d %m %Y %H:%M:%S") << std::endl;
     bool toClose = false;
     bool pause = false;
-    std::map<time_t, std::vector<std::function< void() >>> events;
+    EventsMap events;
     std::thread event_thread(event_loop, std::ref(toClose), std::ref(pause), std::ref(actualTimeStruct), std::ref(events));
     std::thread command_thread(commands, std::ref(toClose), std::ref(pause), std::ref(actualTimeStruct), std::ref(events), std::ref(parkingZonePrices), std::ref(parkingPlaces));
     event_thread.join();

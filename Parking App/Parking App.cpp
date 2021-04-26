@@ -100,6 +100,7 @@ typedef std::map<time_t, std::vector<std::function< void() >>> EventsMap;
 typedef std::map<ParkingPlace, ZoneTypeMax> ParkingPlaceDetails;
 typedef std::map < ZoneHourMinute, Money> ParkingZonePrices;
 typedef std::map<std::tuple<ParkingPlace, time_t>, std::set<Car>> CarsInParking;
+typedef std::function< void() > Event;
 
 void carCommandParsing(ParkingPlaceDetails& parkingPlaces,const std::string& command, ZoneTypeMax& zoneTypeMax, std::time_t& timeBegin, std::time_t& duration, Car& car, ParkingPlace& place) {
     std::string ignore, date, clock;
@@ -149,6 +150,38 @@ void addCarForFollowingVerificationsAndPriceComptuting(std::time_t &timeBegin, s
     }
 }
 
+void safeAddEvent(EventsMap& events, time_t whenTime, Event&& event) {
+    if (!events.count(whenTime)) {
+        events[whenTime] = std::vector<std::function <void()>>();
+    }
+    events[whenTime].push_back(event);
+}
+
+void addCarEvent(EventsMap& events, time_t whenTime, Car& car, ParkingPlace& place) {
+    safeAddEvent(events, whenTime, [car, place]()
+        {
+            std::cout << car.v << " parking at " << place.v << std::endl;
+        }
+    );
+}
+
+void messageCarEvent(EventsMap& events, time_t whenTime, Car& car, ParkingPlace& place) {
+    safeAddEvent(events, whenTime, [car, place]()
+        {
+            std::cout << "Attention! Your parking for " << car.v << " at " << place.v << " is about to expire" << std::endl;
+        }
+    );
+}
+
+void leavingCarEvent(EventsMap& events, time_t whenTime, Car& car, ParkingPlace& place) {
+    safeAddEvent(events, whenTime, [car, place]()
+        {
+            std::cout << car.v << " left " << place.v << std::endl;
+        }
+    );
+}
+
+
 void programACar(ParkingPlaceDetails& parkingPlaces, std::string& command, std::tm& timeNow, CarsInParking& carsInParking, EventsMap& events, Money& wallet, ParkingZonePrices& parkingZonePrices) {
     std::time_t duration;
     std::time_t timeBegin;
@@ -181,32 +214,9 @@ void programACar(ParkingPlaceDetails& parkingPlaces, std::string& command, std::
 
     addCarForFollowingVerificationsAndPriceComptuting(timeBegin, timeStop, carsInParking, place, events, car, parkingZone, wallet, parkingZonePrices);
 
-    if (!events.count(timeBegin)) {
-        events[timeBegin] = std::vector<std::function <void()>>();
-    }
-    events[timeBegin].push_back([car, place]()
-        {
-            std::cout << car.v << " parking at " << place.v << std::endl;
-        }
-    );
-
-    if (!events.count(timeMessage)) {
-        events[timeMessage] = std::vector<std::function <void()>>();
-    }
-    events[timeMessage].push_back([car, place]()
-        {
-            std::cout << "Attention! Your parking for " << car.v << " at " << place.v << " is about to expire" << std::endl;
-        }
-    );
-
-    if (!events.count(timeStop)) {
-        events[timeStop] = std::vector<std::function <void()>>();
-    }
-    events[timeStop].push_back([car, place]()
-        {
-            std::cout << car.v << " left " << place.v << std::endl;
-        }
-    );
+    addCarEvent(events, timeBegin, car, place);
+    messageCarEvent(events, timeMessage, car, place);
+    leavingCarEvent(events, timeStop, car, place);
 }
 
 void event_loop(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events) {

@@ -15,7 +15,6 @@
 #include <cstdio>
 #include <tuple>
 
-
 template <class type> time_t addTime(const time_t& time, const int& value) {
     return std::chrono::system_clock::to_time_t(std::chrono::system_clock::from_time_t(time) + type(value));
 }
@@ -127,7 +126,8 @@ bool verifyMaxCapacity(std::time_t& timeBegin, std::time_t& timeStop, PlaceMax& 
     return false;
 }
 
-void addCarForFollowingVerifications(std::time_t ) {
+void addCarForFollowingVerificationsAndPriceComptuting(std::time_t &timeBegin, std::time_t& timeStop, CarsInParking& carsInParking, ParkingPlace& place, EventsMap& events, Car& car, ParkingZone& parkingZone, Money& wallet, ParkingZonePrices& parkingZonePrices) {
+    std::tm timeIteratorStruct_;
     for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = addTime<std::chrono::minutes>(timeIterator, 15)) {
         if (!carsInParking.count({ place, timeIterator })) {
             carsInParking[{ place, timeIterator }] = std::set<Car>();
@@ -149,6 +149,65 @@ void addCarForFollowingVerifications(std::time_t ) {
     }
 }
 
+void programACar(ParkingPlaceDetails& parkingPlaces, std::string& command, std::tm& timeNow, CarsInParking& carsInParking, EventsMap& events, Money& wallet, ParkingZonePrices& parkingZonePrices) {
+    std::time_t duration;
+    std::time_t timeBegin;
+    ParkingPlace place;
+    ZoneTypeMax zoneTypeMax;
+    Car car;
+    carCommandParsing(parkingPlaces, command, zoneTypeMax, timeBegin, duration, car, place);
+    PlaceMax maxCapacityOfLocation = std::get<PlaceMax>(zoneTypeMax.v);
+    ParkingType parkingType = std::get<ParkingType>(zoneTypeMax.v);
+    ParkingZone parkingZone = std::get<ParkingZone>(zoneTypeMax.v);
+
+    if (timeBegin < mktime(&timeNow)) {
+        std::cout << "you can't reserve the past." << std::endl;
+        return;
+    }
+
+    std::time_t timeMax = parkingType.timeMax(timeBegin);
+
+    std::time_t timeStop = addTime<std::chrono::minutes>(timeBegin, duration);
+    std::time_t timeMessage = addTime<std::chrono::minutes>(timeStop, -10);
+
+    if (timeStop > timeMax) {
+        std::cout << "Time too long" << std::endl;
+        return;
+    }
+
+    if (verifyMaxCapacity(timeBegin, timeStop, maxCapacityOfLocation, place, carsInParking)) {
+        return;
+    }
+
+    addCarForFollowingVerificationsAndPriceComptuting(timeBegin, timeStop, carsInParking, place, events, car, parkingZone, wallet, parkingZonePrices);
+
+    if (!events.count(timeBegin)) {
+        events[timeBegin] = std::vector<std::function <void()>>();
+    }
+    events[timeBegin].push_back([car, place]()
+        {
+            std::cout << car.v << " parking at " << place.v << std::endl;
+        }
+    );
+
+    if (!events.count(timeMessage)) {
+        events[timeMessage] = std::vector<std::function <void()>>();
+    }
+    events[timeMessage].push_back([car, place]()
+        {
+            std::cout << "Attention! Your parking for " << car.v << " at " << place.v << " is about to expire" << std::endl;
+        }
+    );
+
+    if (!events.count(timeStop)) {
+        events[timeStop] = std::vector<std::function <void()>>();
+    }
+    events[timeStop].push_back([car, place]()
+        {
+            std::cout << car.v << " left " << place.v << std::endl;
+        }
+    );
+}
 
 void event_loop(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events) {
     for (;!toClose;) {
@@ -197,80 +256,7 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events, P
         }
 
         if (std::regex_match(command, std::regex("(Program)(.*)"))) {
-            time_t duration;
-            std::time_t timeBegin;
-            ParkingPlace place;
-            ZoneTypeMax zoneTypeMax;
-            Car car;
-            carCommandParsing(parkingPlaces, command, zoneTypeMax, timeBegin, duration, car, place);
-            PlaceMax maxCapacityOfLocation = std::get<PlaceMax>(zoneTypeMax.v);
-            ParkingType parkingType = std::get<ParkingType>(zoneTypeMax.v);
-            ParkingZone parkingZone = std::get<ParkingZone>(zoneTypeMax.v);
-            if (timeBegin < mktime(&timeNow)) {
-                std::cout << "you can't reserve the past." << std::endl;
-                continue;
-            }
-
-            std::time_t timeMax = parkingType.timeMax(timeBegin);
-
-            std::time_t timeStop = addTime<std::chrono::minutes>(timeBegin, duration);
-            std::time_t timeMessage = addTime<std::chrono::minutes>(timeStop, -10);
-
-            if (timeStop > timeMax) {
-                std::cout << "Time too long" << std::endl;
-                continue;
-            }
-
-            if (verifyMaxCapacity(timeBegin, timeStop, maxCapacityOfLocation, place, carsInParking)) {
-                continue;
-            }
-
-            for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = addTime<std::chrono::minutes>(timeIterator, 15)) {
-                if (!carsInParking.count({ place, timeIterator })) {
-                    carsInParking[{ place, timeIterator }] = std::set<Car>();
-                    std::time_t whenToDelete = timeIterator = addTime<std::chrono::minutes>(timeIterator, 15);
-                    if (!events.count(whenToDelete)) {
-                        events[whenToDelete] = std::vector<std::function <void()>>();
-                    }
-                    events[whenToDelete].push_back([&, place, timeIterator]()
-                        {
-                            carsInParking.erase({ place, timeIterator });
-                        }
-                    );
-                }
-                carsInParking[{ place, timeIterator }].insert(car);
-                
-                localtime_s(&timeIteratorStruct_, &timeIterator);
-                ZoneHourMinute zoneHourMinute({{ParkingZone({ parkingZone }), Hour({ (unsigned)timeIteratorStruct_.tm_hour }), Minute({ (unsigned)timeIteratorStruct_.tm_min })}} );
-                wallet += parkingZonePrices[zoneHourMinute];
-            }
-
-            if (!events.count(timeBegin)) {
-                events[timeBegin] = std::vector<std::function <void()>>();
-            }
-            events[timeBegin].push_back([car, place]()
-                {
-                    std::cout << car.v << " parking at " << place.v << std::endl;
-                }
-            );
-
-            if (!events.count(timeMessage)) {
-                events[timeMessage] = std::vector<std::function <void()>>();
-            }
-            events[timeMessage].push_back([car, place]()
-                {
-                    std::cout << "Attention! Your parking for " << car.v << " at " << place.v << " is about to expire" << std::endl;
-                }
-            );
-
-            if (!events.count(timeStop)) {
-                events[timeStop] = std::vector<std::function <void()>>();
-            }
-            events[timeStop].push_back([car, place]()
-                {
-                    std::cout << car.v << " left " << place.v << std::endl;
-                }
-            );
+            programACar(parkingPlaces, command, timeNow, carsInParking, events, wallet, parkingZonePrices);
         }
     }
 }

@@ -100,8 +100,9 @@ struct Money : Model<long double> {
 typedef std::map<time_t, std::vector<std::function< void() >>> EventsMap;
 typedef std::map<ParkingPlace, ZoneTypeMax> ParkingPlaceDetails;
 typedef std::map < ZoneHourMinute, Money> ParkingZonePrices;
+typedef std::map<std::tuple<ParkingPlace, time_t>, std::set<Car>> CarsInParking;
 
-void carCommandParsing(ParkingPlaceDetails& parkingPlaces,const std::string& command, ZoneTypeMax& zoneTypeMax, std::time_t& timeBegin, std::time_t& duration, Car &car, ParkingPlace place) {
+void carCommandParsing(ParkingPlaceDetails& parkingPlaces,const std::string& command, ZoneTypeMax& zoneTypeMax, std::time_t& timeBegin, std::time_t& duration, Car& car, ParkingPlace& place) {
     std::string ignore, date, clock;
     std::stringstream ssComm(command);
     ssComm >> ignore >> car.v >> ignore >> place.v >> date >> clock >> duration;
@@ -113,6 +114,41 @@ void carCommandParsing(ParkingPlaceDetails& parkingPlaces,const std::string& com
     timeBegin = std::mktime(&timeBeginParking);
     zoneTypeMax = parkingPlaces[ParkingPlace({ place })];
 }
+
+bool verifyMaxCapacity(std::time_t& timeBegin, std::time_t& timeStop, PlaceMax& maxCapacityOfLocation, ParkingPlace& place, CarsInParking &carsInParking) {
+    for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = addTime<std::chrono::minutes>(timeIterator, 15)) {
+        if (carsInParking.count({ place, timeIterator })) {
+            if (!maxCapacityOfLocation.possibleToIncrease(carsInParking[{ place, timeIterator }].size())) {
+                std::cout << "Sorry, all parking reserved." << std::endl;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void addCarForFollowingVerifications(std::time_t ) {
+    for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = addTime<std::chrono::minutes>(timeIterator, 15)) {
+        if (!carsInParking.count({ place, timeIterator })) {
+            carsInParking[{ place, timeIterator }] = std::set<Car>();
+            std::time_t whenToDelete = timeIterator = addTime<std::chrono::minutes>(timeIterator, 15);
+            if (!events.count(whenToDelete)) {
+                events[whenToDelete] = std::vector<std::function <void()>>();
+            }
+            events[whenToDelete].push_back([&, place, timeIterator]()
+                {
+                    carsInParking.erase({ place, timeIterator });
+                }
+            );
+        }
+        carsInParking[{ place, timeIterator }].insert(car);
+
+        localtime_s(&timeIteratorStruct_, &timeIterator);
+        ZoneHourMinute zoneHourMinute({ {ParkingZone({ parkingZone }), Hour({ (unsigned)timeIteratorStruct_.tm_hour }), Minute({ (unsigned)timeIteratorStruct_.tm_min })} });
+        wallet += parkingZonePrices[zoneHourMinute];
+    }
+}
+
 
 void event_loop(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events) {
     for (;!toClose;) {
@@ -138,7 +174,7 @@ void event_loop(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events)
 void commands(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events, ParkingZonePrices& parkingZonePrices, ParkingPlaceDetails &parkingPlaces) {
     std::string command;
     ZoneTypeMax zoneTypeMax;
-    std::map<std::tuple<ParkingPlace, time_t>, std::set<Car>> carsInParking;
+    CarsInParking carsInParking;
     std::tm timeIteratorStruct_;
     Money wallet({ 0 });
     while (!toClose) {
@@ -162,7 +198,6 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events, P
 
         if (std::regex_match(command, std::regex("(Program)(.*)"))) {
             time_t duration;
-            bool possible = true;
             std::time_t timeBegin;
             ParkingPlace place;
             ZoneTypeMax zoneTypeMax;
@@ -186,17 +221,7 @@ void commands(bool& toClose, bool& pause, std::tm& timeNow, EventsMap& events, P
                 continue;
             }
 
-            for (std::time_t timeIterator = timeBegin; timeIterator < timeStop; timeIterator = addTime<std::chrono::minutes>(timeIterator, 15)) {
-                if (carsInParking.count({ place, timeIterator })) {
-                    if (maxCapacityOfLocation.possibleToIncrease(carsInParking[{ place, timeIterator }].size())) {
-                        std::cout << "Sorry, all parking reserved." << std::endl;
-                        possible = false;
-                        break;
-                    }
-                }
-            }
-
-            if (possible == false) {
+            if (verifyMaxCapacity(timeBegin, timeStop, maxCapacityOfLocation, place, carsInParking)) {
                 continue;
             }
 

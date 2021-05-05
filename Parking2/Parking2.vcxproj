@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{e669edc7-489e-4502-825a-78546be3c20b}</ProjectGuid>
-    <RootNamespace>playingwithlambdas</RootNamespace>
+    <ProjectGuid>{045f87a1-0116-4825-90c5-fffdfbe9d9d8}</ProjectGuid>
+    <RootNamespace>Parking2</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -131,6 +131,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -140,7 +141,28 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="playing with lambdas.cpp" />
+    <ClCompile Include="Parking2.cpp" />
+    <ClCompile Include="time.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Car.hpp" />
+    <ClInclude Include="DayTime.hpp" />
+    <ClInclude Include="EventCar.hpp" />
+    <ClInclude Include="Hour.hpp" />
+    <ClInclude Include="Identifier.hpp" />
+    <ClInclude Include="MaxCapacity.hpp" />
+    <ClInclude Include="message.hpp" />
+    <ClInclude Include="Minute.hpp" />
+    <ClInclude Include="Money.hpp" />
+    <ClInclude Include="ParkingManager.hpp" />
+    <ClInclude Include="Model.hpp" />
+    <ClInclude Include="ParkingPlace.hpp" />
+    <ClInclude Include="ParkingType.hpp" />
+    <ClInclude Include="PricingTable.hpp" />
+    <ClInclude Include="ReadableTime.hpp" />
+    <ClInclude Include="time.hpp" />
+    <ClInclude Include="UnnamedEvent.hpp" />
+    <ClInclude Include="Zone.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

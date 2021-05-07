@@ -7,6 +7,7 @@ struct Message {
 	std::function< void()> delete_;
 	std::function< void()> actionate;
 	Time until;
+
 	void accept() {
 		actionate();
 		delete_();

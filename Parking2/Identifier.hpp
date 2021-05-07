@@ -6,4 +6,7 @@ struct Identifier:Model<long long> {
 		this->v = ID;
 		ID++;
 	}
+	Identifier(const long long &id) {
+		this->v = id;
+	}
 };

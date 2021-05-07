@@ -49,11 +49,6 @@ struct ParkingManager {
 			return false;
 		}
 
-		// parking is not closed
-		if (place.maxCapacity.v == 0) {
-			return false;
-		}
-
 		// maxCapacity not arrived
 		for (Time time = timeBegin; time < timeEnd; time.addTime<std::chrono::minutes>(15)) {
 			if (parkingSimulator.count({ time, place })) {
